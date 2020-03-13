@@ -98,6 +98,7 @@ GUI window has following form inputs:
 **Alert for small crater population**
 
 **Diameter-aware analysis**
+
 Finally, I have received some feedback from several colleagues. They are amazed about our work and the way that we remove the secondaries. However, they conviced me that something is missing in the code: the inclusion of the crater diameter. Since secondaries are clustered but also have a similar diameter within a cluster, we should take into account this in the tool. 
 Would it be possible to split the simulated crater population and the real population by diameter bin ? I am sure it is and it could improve a lot the efficiency of the tool !
 Here is how you can do that:
