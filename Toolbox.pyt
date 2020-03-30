@@ -1,5 +1,9 @@
 import arcpy
-from test import hello
+import pandas as pd
+import scia_utils
+
+# uncomment for testing
+reload(scia_utils)
 
 class Toolbox(object):
     def __init__(self):
@@ -10,6 +14,26 @@ class Toolbox(object):
 
         # List of tool classes associated with this toolbox
         self.tools = [SecondaryCraterRemovalTool]
+
+
+def arcgis_table_to_dataframe(in_fc, input_fields=None, query="", skip_nulls=False, null_values=None):
+    """Function will convert an arcgis table into a pandas dataframe with an object ID index, and the selected
+    input fields. Uses TableToNumPyArray to get initial data.
+    :param - in_fc - input feature class or table to convert
+    :param - input_fields - fields to input into a da numpy converter function
+    :param - query - sql like query to filter out records returned
+    :param - skip_nulls - skip rows with null values
+    :param - null_values - values to replace null values with.
+    :returns - pandas dataframe"""
+    OIDFieldName = arcpy.Describe(in_fc).OIDFieldName
+    if input_fields:
+        final_fields = [OIDFieldName] + input_fields
+    else:
+        final_fields = [field.name for field in arcpy.ListFields(in_fc)]
+    np_array = arcpy.da.TableToNumPyArray(in_fc, final_fields, query, skip_nulls, null_values)
+    object_id_index = np_array[OIDFieldName]
+    fc_dataframe = pd.DataFrame(np_array, index=object_id_index, columns=input_fields)
+    return fc_dataframe
 
 
 class SecondaryCraterRemovalTool(object):
@@ -69,7 +93,6 @@ class SecondaryCraterRemovalTool(object):
 
     def execute(self, parameters, messages):
         """The source code of the tool."""
-        arcpy.AddMessage("Name is: {0}".format(hello()))
         crater_detection_layer = parameters[0].value
 
         thiessen_fc = "./thiessen_temp.shp"
@@ -94,6 +117,23 @@ class SecondaryCraterRemovalTool(object):
 
         arcpy.AddMessage("thiessen layer: {0}".format(type(result)))
 
+        df = arcgis_table_to_dataframe(thiessen_fc, ['lat', 'long', 'area'])
+        arcpy.AddMessage(str(df))
 
+        threshold_area = scia_utils.simulate_crater_populations(df)
+
+        arcpy.AddMessage("threshold_area: {}".format(threshold_area))
+
+        primary_area = "./output_primary_area.shp"
+        arcpy.Delete_management(primary_area)
+
+        arcpy.TableSelect_analysis(thiessen_fc, primary_area, '"area" > {}'.format(threshold_area))
+
+        mxd = arcpy.mapping.MapDocument("CURRENT")  
+        df = arcpy.mapping.ListDataFrames(mxd, "Layers")[0]  
+        addLayer = arcpy.mapping.Layer(primary_area)
+        arcpy.mapping.AddLayer(df, addLayer, "BOTTOM")  
+        arcpy.RefreshActiveView()  
+        arcpy.RefreshTOC()
 
         return

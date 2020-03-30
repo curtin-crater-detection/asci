@@ -18,7 +18,6 @@ def moving_average(a, n=5):
 
 #%%
 area_size = 6989.802
-area_real_100 = area_size
 
 thiessen_real = pd.read_csv("thiessen_id_206.txt")
 area_pol = thiessen_real["area_pol"]
@@ -32,7 +31,7 @@ nbins_real = np.arange(area_pol.min(), area_pol.max(), area_pol.median() / 10)
 max_plot = area_pol.median() * 10
 
 # why sqrt here?
-edge = np.sqrt(area_real_100)
+edge = np.sqrt(area_size)
 
 # %%
 n_it = 50
