@@ -35,6 +35,14 @@ def arcgis_table_to_dataframe(in_fc, input_fields=None, query="", skip_nulls=Fal
     fc_dataframe = pd.DataFrame(np_array, index=object_id_index, columns=input_fields)
     return fc_dataframe
 
+def add_layer_to_view(layer, order="BOTTOM"):
+    mxd = arcpy.mapping.MapDocument("CURRENT")  
+    df = arcpy.mapping.ListDataFrames(mxd, "Layers")[0]  
+    addLayer = arcpy.mapping.Layer(layer)
+    arcpy.mapping.AddLayer(df, addLayer, order)
+    arcpy.RefreshActiveView()  
+    arcpy.RefreshTOC()
+
 
 class SecondaryCraterRemovalTool(object):
     def __init__(self):
@@ -104,12 +112,7 @@ class SecondaryCraterRemovalTool(object):
         result = arcpy.CreateThiessenPolygons_analysis(in_features=crater_detection_layer,out_feature_class=thiessen_fc,fields_to_copy="ALL")
         arcpy.AddField_management(thiessen_fc, "area", "FLOAT")
 
-        mxd = arcpy.mapping.MapDocument("CURRENT")  
-        df = arcpy.mapping.ListDataFrames(mxd, "Layers")[0]  
-        addLayer = arcpy.mapping.Layer(thiessen_fc)
-        arcpy.mapping.AddLayer(df, addLayer, "BOTTOM")  
-        arcpy.RefreshActiveView()  
-        arcpy.RefreshTOC()
+        add_layer_to_view(thiessen_fc)
 
         # arcpy.AddGeometryAttributes_management(thiessen_fc,"AREA_GEODESIC", Area_Unit="SQUARE_KILOMETERS")
         arcpy.CalculateField_management(thiessen_fc,"area", "!shape.area@squarekilometers!", "PYTHON_9.3")
@@ -125,15 +128,27 @@ class SecondaryCraterRemovalTool(object):
         arcpy.AddMessage("threshold_area: {}".format(threshold_area))
 
         primary_area = "./output_primary_area.shp"
+        secondary_area = "./output_secondary_area.shp"
         arcpy.Delete_management(primary_area)
+        arcpy.Delete_management(secondary_area)
 
-        arcpy.TableSelect_analysis(thiessen_fc, primary_area, '"area" > {}'.format(threshold_area))
+        arcpy.Select_analysis(thiessen_fc, primary_area, '"area" > {}'.format(threshold_area))
+        arcpy.Select_analysis(thiessen_fc, secondary_area, '"area" <= {}'.format(threshold_area))
 
-        mxd = arcpy.mapping.MapDocument("CURRENT")  
-        df = arcpy.mapping.ListDataFrames(mxd, "Layers")[0]  
-        addLayer = arcpy.mapping.Layer(primary_area)
-        arcpy.mapping.AddLayer(df, addLayer, "BOTTOM")  
-        arcpy.RefreshActiveView()  
-        arcpy.RefreshTOC()
+        add_layer_to_view(primary_area)
+        add_layer_to_view(secondary_area)
 
+        primary_craters = "./output_primary_craters.shp"
+        arcpy.Delete_management(primary_craters)
+        selection = arcpy.SelectLayerByLocation_management(crater_detection_layer, "WITHIN", primary_area)
+        arcpy.CopyFeatures_management(selection, primary_craters)
+
+        add_layer_to_view(primary_craters, order="TOP")
+
+        secondary_craters = "./output_secondary_craters.shp"
+        arcpy.Delete_management(secondary_craters)
+        secondary_selection = arcpy.SelectLayerByLocation_management(crater_detection_layer, "WITHIN", secondary_area)
+        arcpy.CopyFeatures_management(secondary_selection, secondary_craters)
+
+        add_layer_to_view(secondary_craters, order="TOP")
         return
