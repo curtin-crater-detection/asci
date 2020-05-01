@@ -21,22 +21,6 @@ class TestTool(object):
 
     def getParameterInfo(self):
         """Define parameter definitions"""
-
-        param0 = arcpy.Parameter(
-            displayName="Crater detection layer",
-            name="crater_detection_layer",
-            datatype="GPFeatureLayer",
-            parameterType="Required",
-            direction="Input")
-
-        param1 = arcpy.Parameter(
-            displayName="Counting area layer",
-            name="counting_area_layer",
-            datatype="GPFeatureLayer",
-            parameterType="Required",
-            direction="Input")
-
-
         # @TODO: output params?
         # param2 = arcpy.Parameter(
         #     displayName="Output Features",
@@ -48,9 +32,9 @@ class TestTool(object):
         # param2.parameterDependencies = [param0.name]
         # param2.schema.clone = True
 
-        params = [param0, param1]
+        # params = [param0, param1]
 
-        return params
+        return
 
     def isLicensed(self):
         """Set whether tool is licensed to execute."""
