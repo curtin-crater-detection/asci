@@ -1,6 +1,7 @@
 import arcpy
 import pandas as pd
 import scia_utils
+import os
 
 # uncomment for testing
 reload(scia_utils)
@@ -68,19 +69,18 @@ class SecondaryCraterRemovalTool(object):
             parameterType="Required",
             direction="Input")
 
+        param2 = arcpy.Parameter(
+            displayName="Output folder",
+            name="output_folder",
+            datatype="DEFolder",
+            parameterType="Required",
+            direction="Input"
+        )
 
-        # @TODO: output params?
-        # param2 = arcpy.Parameter(
-        #     displayName="Output Features",
-        #     name="out_features",
-        #     datatype="GPFeatureLayer",
-        #     parameterType="Derived",
-        #     direction="Output")
+        param2.filter.list = ["File System"]
 
-        # param2.parameterDependencies = [param0.name]
-        # param2.schema.clone = True
 
-        params = [param0, param1]
+        params = [param0, param1, param2]
 
         return params
 
@@ -102,8 +102,11 @@ class SecondaryCraterRemovalTool(object):
     def execute(self, parameters, messages):
         """The source code of the tool."""
         crater_detection_layer = parameters[0].value
+        BASE_FOLDER = parameters[2].valueAsText
 
-        thiessen_fc = "./thiessen_temp.shp"
+        arcpy.AddMessage("BASE_FOLDER: {0}".format(BASE_FOLDER))
+
+        thiessen_fc = os.path.join(BASE_FOLDER, "thiessen_temp.shp")
         arcpy.Delete_management(thiessen_fc)
 
         # thiessen_fc = arcpy.CreateFeatureclass_management( ".", "thiessen_tmp.shp", "POLYGON", None, 
@@ -120,15 +123,15 @@ class SecondaryCraterRemovalTool(object):
 
         arcpy.AddMessage("thiessen layer: {0}".format(type(result)))
 
-        df = arcgis_table_to_dataframe(thiessen_fc, ['lat', 'long', 'area'])
+        df = arcgis_table_to_dataframe(thiessen_fc, ['latitute', 'longitude', 'area'])
         arcpy.AddMessage(str(df))
 
         threshold_area = scia_utils.simulate_crater_populations(df)
 
         arcpy.AddMessage("threshold_area: {}".format(threshold_area))
 
-        primary_area = "./output_primary_area.shp"
-        secondary_area = "./output_secondary_area.shp"
+        primary_area = os.path.join(BASE_FOLDER, "output_primary_area.shp")
+        secondary_area = os.path.join(BASE_FOLDER, "output_secondary_area.shp")
         arcpy.Delete_management(primary_area)
         arcpy.Delete_management(secondary_area)
 
@@ -138,14 +141,14 @@ class SecondaryCraterRemovalTool(object):
         add_layer_to_view(primary_area)
         add_layer_to_view(secondary_area)
 
-        primary_craters = "./output_primary_craters.shp"
+        primary_craters = os.path.join(BASE_FOLDER, "output_primary_craters.shp")
         arcpy.Delete_management(primary_craters)
         selection = arcpy.SelectLayerByLocation_management(crater_detection_layer, "WITHIN", primary_area)
         arcpy.CopyFeatures_management(selection, primary_craters)
 
         add_layer_to_view(primary_craters, order="TOP")
 
-        secondary_craters = "./output_secondary_craters.shp"
+        secondary_craters = os.path.join(BASE_FOLDER, "output_secondary_craters.shp")
         arcpy.Delete_management(secondary_craters)
         secondary_selection = arcpy.SelectLayerByLocation_management(crater_detection_layer, "WITHIN", secondary_area)
         arcpy.CopyFeatures_management(secondary_selection, secondary_craters)
