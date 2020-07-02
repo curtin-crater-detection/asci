@@ -39,3 +39,7 @@ C:\Python27\ArcGIS10.6\python.exe -m pip install C:\Users\YOUR_USERNAME\Download
 ### Installing the ArcMap toolbox
 
 Add this repository as a source using the ArcMap file browser. The Python toolbox should now be visible in the ArcMap tools directory. Clicking the Toolbox should then reveal a tool called "Secondary Crater Removal". Double clicking on the tool will open a dialog window through which the process can be launched.
+
+## Dimensions
+
+The counting area must be in square kilometres.
