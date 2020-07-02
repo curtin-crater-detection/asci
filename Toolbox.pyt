@@ -117,6 +117,9 @@ class SecondaryCraterRemovalTool(object):
             direction="Input"
         )
 
+        # 300 simulation iterations by default
+        param6.value = 300
+
         param5.value = "Area"
 
         param2.filter.list = ["File System"]
