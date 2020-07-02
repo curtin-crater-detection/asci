@@ -44,6 +44,12 @@ def add_layer_to_view(layer, order="BOTTOM"):
     arcpy.RefreshActiveView()  
     arcpy.RefreshTOC()
 
+def get_counting_area_size(counting_area_layer, area_feature_name):
+    cursor = arcpy.SearchCursor(counting_area_layer)
+    row = next(cursor)
+    area = row.getValue(area_feature_name)
+    return area
+
 
 class SecondaryCraterRemovalTool(object):
     def __init__(self):
@@ -77,10 +83,37 @@ class SecondaryCraterRemovalTool(object):
             direction="Input"
         )
 
+        param3 = arcpy.Parameter(
+            displayName="Crater detection layer latitude feature name",
+            name="lat_feature_name",
+            datatype="GPString",
+            direction="Input"
+        )
+
+        param3.value = "latitude"
+
+        param4 = arcpy.Parameter(
+            displayName="Crater detection layer longitude feature name",
+            name="lon_feature_name",
+            datatype="GPString",
+            direction="Input"
+        )
+
+        param4.value = "longitude"
+
+        param5 = arcpy.Parameter(
+            displayName="Counting area layer area feature name",
+            name="area_feature_name",
+            datatype="GPString",
+            direction="Input"
+        )
+
+        param5.value = "Area"
+
         param2.filter.list = ["File System"]
 
 
-        params = [param0, param1, param2]
+        params = [param0, param1, param2, param3, param4, param5]
 
         return params
 
@@ -102,6 +135,10 @@ class SecondaryCraterRemovalTool(object):
     def execute(self, parameters, messages):
         """The source code of the tool."""
         crater_detection_layer = parameters[0].value
+        counting_area_layer = parameters[1].value
+        lat_feature_name = parameters[3].valueAsText
+        lon_feature_name = parameters[4].valueAsText
+        area_feature_name = parameters[5].valueAsText
         BASE_FOLDER = parameters[2].valueAsText
 
         arcpy.AddMessage("BASE_FOLDER: {0}".format(BASE_FOLDER))
@@ -123,10 +160,14 @@ class SecondaryCraterRemovalTool(object):
 
         arcpy.AddMessage("thiessen layer: {0}".format(type(result)))
 
-        df = arcgis_table_to_dataframe(thiessen_fc, ['latitute', 'longitude', 'area'])
+        df = arcgis_table_to_dataframe(thiessen_fc, [lat_feature_name, lon_feature_name, 'area'])
         arcpy.AddMessage(str(df))
 
-        threshold_area = scia_utils.simulate_crater_populations(df)
+        counting_area_size = get_counting_area_size(counting_area_layer, area_feature_name)
+
+        arcpy.AddMessage("counting area size: {}".format(counting_area_size))
+
+        threshold_area = scia_utils.simulate_crater_populations(df, counting_area_size)
 
         arcpy.AddMessage("threshold_area: {}".format(threshold_area))
 

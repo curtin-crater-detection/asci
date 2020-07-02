@@ -25,8 +25,7 @@ def moving_average(a, n=5):
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1 :] / n
 
-def simulate_crater_populations(input):
-    area_size = 202.362
+def simulate_crater_populations(input, area_size):
     area_pol = input["area"]
 
     n_craters = len(area_pol)
