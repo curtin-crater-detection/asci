@@ -110,10 +110,19 @@ class SecondaryCraterRemovalTool(object):
 
         param5.value = "Area"
 
+        param6 = arcpy.Parameter(
+            displayName="Number of simulation iterations",
+            name="simulation_iterations",
+            datatype="GPLong",
+            direction="Input"
+        )
+
+        param5.value = "Area"
+
         param2.filter.list = ["File System"]
 
 
-        params = [param0, param1, param2, param3, param4, param5]
+        params = [param0, param1, param2, param3, param4, param5, param6]
 
         return params
 
@@ -139,6 +148,7 @@ class SecondaryCraterRemovalTool(object):
         lat_feature_name = parameters[3].valueAsText
         lon_feature_name = parameters[4].valueAsText
         area_feature_name = parameters[5].valueAsText
+        simulation_iterations = parameters[6].value
         BASE_FOLDER = parameters[2].valueAsText
 
         arcpy.AddMessage("BASE_FOLDER: {0}".format(BASE_FOLDER))
@@ -167,7 +177,7 @@ class SecondaryCraterRemovalTool(object):
 
         arcpy.AddMessage("counting area size: {}".format(counting_area_size))
 
-        threshold_area = scia_utils.simulate_crater_populations(df, counting_area_size)
+        threshold_area = scia_utils.simulate_crater_populations(df, counting_area_size, simulation_iterations)
 
         arcpy.AddMessage("threshold_area: {}".format(threshold_area))
 
