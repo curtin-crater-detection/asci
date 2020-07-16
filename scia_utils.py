@@ -25,7 +25,7 @@ def moving_average(a, n=5):
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1 :] / n
 
-def simulate_crater_populations(input, area_size, simulation_iterations):
+def simulate_crater_populations(input, area_size, simulation_iterations, debug=False):
     area_pol = input["area"]
 
     n_craters = len(area_pol)
@@ -45,8 +45,9 @@ def simulate_crater_populations(input, area_size, simulation_iterations):
     # run a test showing the output plot of `Voronoi()`
     points = 0 + (edge - 0) * np.random.rand(n_craters, 2)
     vor = Voronoi(points)
-    voronoi_plot_2d(vor)
-    plt.show()
+    if(debug):
+        voronoi_plot_2d(vor)
+        plt.show()
 
 
 
@@ -81,16 +82,16 @@ def simulate_crater_populations(input, area_size, simulation_iterations):
     px = sample[idx]
     py = f_real_interp[idx]
 
+    if(debug):
+        plt.plot(nbins_real[:-1], mean_simu, label="Mean of random data")
+        plt.plot(nbins_real[:-1], std_simu_pos, label="Mean +1STD of random data")
+        plt.plot(nbins_real[:-1], std_simu_neg, label="Mean -1STD of random data")
+        plt.plot(sample, f_real_interp, label="Data")
+        plt.xlim(0, 50)
 
-    plt.plot(nbins_real[:-1], mean_simu, label="Mean of random data")
-    plt.plot(nbins_real[:-1], std_simu_pos, label="Mean +1STD of random data")
-    plt.plot(nbins_real[:-1], std_simu_neg, label="Mean -1STD of random data")
-    plt.plot(sample, f_real_interp, label="Data")
-    plt.xlim(0, 50)
-
-    plt.scatter(px, py, s=100, marker="o")
-    plt.legend(loc="upper right")
-    plt.show()
+        plt.scatter(px, py, s=100, marker="o")
+        plt.legend(loc="upper right")
+        plt.show()
 
     threshold_area = px
 
