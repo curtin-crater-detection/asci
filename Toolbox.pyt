@@ -50,6 +50,24 @@ def get_counting_area_size(counting_area_layer, area_feature_name):
     area = row.getValue(area_feature_name)
     return area
 
+def get_pairs(my_list):
+    """
+    Returns a set of pairs from a list
+
+    eg if the list is [1, 2, 3] returns [(1, 2), (2, 3)]
+    """
+    return  [(current, my_list[idx + 1] if  - 1 else None) for idx, current in enumerate(my_list) if idx < len(my_list) - 1]
+
+
+def get_diam_comparison_statement(min_diam, max_diam):
+    """
+    Returns a formatted ArcMap SQL statement to select area based on a min and a max.
+    Handles the case where max_diam == float("inf").
+    """
+    if max_diam < float("inf"):
+        return '"diameter" >= {} AND "diameter" < {}'.format(min_diam, max_diam)
+    else:
+        return '"diameter" >= {}'.format(min_diam)
 
 class SecondaryCraterRemovalTool(object):
     def __init__(self):
@@ -120,12 +138,28 @@ class SecondaryCraterRemovalTool(object):
         # 300 simulation iterations by default
         param6.value = 300
 
-        param5.value = "Area"
+        param7 = arcpy.Parameter(
+            displayName="Use diameter binning",
+            name="use_diam_binning",
+            datatype="GPBoolean",
+            direction="Input"
+        )
+
+        param7.value = True
+
+        param8 = arcpy.Parameter(
+            displayName="Show debug output",
+            name="debug",
+            datatype="GPBoolean",
+            direction="Input"
+        )
+
+        param8.value = False
 
         param2.filter.list = ["File System"]
 
 
-        params = [param0, param1, param2, param3, param4, param5, param6]
+        params = [param0, param1, param2, param3, param4, param5, param6, param7, param8]
 
         return params
 
@@ -153,59 +187,84 @@ class SecondaryCraterRemovalTool(object):
         area_feature_name = parameters[5].valueAsText
         simulation_iterations = parameters[6].value
         BASE_FOLDER = parameters[2].valueAsText
+        use_diam_binning = parameters[7].value
+        debug = parameters[8].value
 
         arcpy.AddMessage("BASE_FOLDER: {0}".format(BASE_FOLDER))
 
-        thiessen_fc = os.path.join(BASE_FOLDER, "thiessen_temp.shp")
-        arcpy.Delete_management(thiessen_fc)
+        if(use_diam_binning):
+            diameter_bins = [0, 88, 125, 177, 250, 354, 500, 707, 1000, 1410, 2000, float("inf")]
+        else:
+            diameter_bins = [0, float("inf")]
 
-        # thiessen_fc = arcpy.CreateFeatureclass_management( ".", "thiessen_tmp.shp", "POLYGON", None, 
-        #                             "DISABLED", "DISABLED", None)
+        # clear any existing selections
+        arcpy.SelectLayerByAttribute_management(crater_detection_layer, "CLEAR_SELECTION") 
 
-        result = arcpy.CreateThiessenPolygons_analysis(in_features=crater_detection_layer,out_feature_class=thiessen_fc,fields_to_copy="ALL")
-        arcpy.AddField_management(thiessen_fc, "area", "FLOAT")
+        for min_diam, max_diam in get_pairs(diameter_bins):
 
-        add_layer_to_view(thiessen_fc)
+            thiessen_fc = os.path.join(BASE_FOLDER, "thiessen_temp_{}.shp".format(min_diam))
+            arcpy.Delete_management(thiessen_fc)
 
-        # arcpy.AddGeometryAttributes_management(thiessen_fc,"AREA_GEODESIC", Area_Unit="SQUARE_KILOMETERS")
-        arcpy.CalculateField_management(thiessen_fc,"area", "!shape.area@squarekilometers!", "PYTHON_9.3")
-        # arcpy.CalculateAreas_stats(thiessen_fc,"AREA_GEODESIC", Area_Unit="SQUARE_KILOMETERS")
+            craters_within_diam_range = os.path.join(BASE_FOLDER, "input_craters_{}.shp".format(min_diam))
+            arcpy.Delete_management(craters_within_diam_range)
 
-        arcpy.AddMessage("thiessen layer: {0}".format(type(result)))
+            # select craters within the diameter range
+            arcpy.Select_analysis(crater_detection_layer, craters_within_diam_range, get_diam_comparison_statement(min_diam, max_diam))
 
-        df = arcgis_table_to_dataframe(thiessen_fc, [lat_feature_name, lon_feature_name, 'area'])
-        arcpy.AddMessage(str(df))
+            crater_count = int(str(arcpy.GetCount_management(craters_within_diam_range)))
 
-        counting_area_size = get_counting_area_size(counting_area_layer, area_feature_name)
+            arcpy.AddMessage("{} craters in the range [{}, {}]".format(crater_count, min_diam, max_diam))
 
-        arcpy.AddMessage("counting area size: {}".format(counting_area_size))
+            # if there are 10 or less craters, all of them are primary
+            if crater_count <= 10 and crater_count > 0:
+                primary_craters = os.path.join(BASE_FOLDER, "output_primary_craters_{}.shp".format(min_diam))
+                arcpy.Delete_management(primary_craters)
+                arcpy.CopyFeatures_management(craters_within_diam_range, primary_craters)
 
-        threshold_area = scia_utils.simulate_crater_populations(df, counting_area_size, simulation_iterations)
+                add_layer_to_view(primary_craters, order="TOP")
+            elif crater_count > 10:
+                result = arcpy.CreateThiessenPolygons_analysis(in_features=craters_within_diam_range,out_feature_class=thiessen_fc,fields_to_copy="ALL")
+                arcpy.AddField_management(thiessen_fc, "area", "FLOAT")
 
-        arcpy.AddMessage("threshold_area: {}".format(threshold_area))
+                add_layer_to_view(thiessen_fc)
+                add_layer_to_view(craters_within_diam_range)
 
-        primary_area = os.path.join(BASE_FOLDER, "output_primary_area.shp")
-        secondary_area = os.path.join(BASE_FOLDER, "output_secondary_area.shp")
-        arcpy.Delete_management(primary_area)
-        arcpy.Delete_management(secondary_area)
+                arcpy.CalculateField_management(thiessen_fc,"area", "!shape.area@squarekilometers!", "PYTHON_9.3")
 
-        arcpy.Select_analysis(thiessen_fc, primary_area, '"area" > {}'.format(threshold_area))
-        arcpy.Select_analysis(thiessen_fc, secondary_area, '"area" <= {}'.format(threshold_area))
+                arcpy.AddMessage("thiessen layer: {0}".format(type(result)))
 
-        add_layer_to_view(primary_area)
-        add_layer_to_view(secondary_area)
+                df = arcgis_table_to_dataframe(thiessen_fc, [lat_feature_name, lon_feature_name, 'area'])
+                arcpy.AddMessage(str(df))
 
-        primary_craters = os.path.join(BASE_FOLDER, "output_primary_craters.shp")
-        arcpy.Delete_management(primary_craters)
-        selection = arcpy.SelectLayerByLocation_management(crater_detection_layer, "WITHIN", primary_area)
-        arcpy.CopyFeatures_management(selection, primary_craters)
+                counting_area_size = get_counting_area_size(counting_area_layer, area_feature_name)
 
-        add_layer_to_view(primary_craters, order="TOP")
+                arcpy.AddMessage("counting area size: {}".format(counting_area_size))
 
-        secondary_craters = os.path.join(BASE_FOLDER, "output_secondary_craters.shp")
-        arcpy.Delete_management(secondary_craters)
-        secondary_selection = arcpy.SelectLayerByLocation_management(crater_detection_layer, "WITHIN", secondary_area)
-        arcpy.CopyFeatures_management(secondary_selection, secondary_craters)
+                threshold_area = scia_utils.simulate_crater_populations(df, counting_area_size, simulation_iterations, debug)
 
-        add_layer_to_view(secondary_craters, order="TOP")
-        return
+                arcpy.AddMessage("threshold_area: {}".format(threshold_area))
+
+                primary_area = os.path.join(BASE_FOLDER, "output_primary_area_{}.shp".format(min_diam))
+                secondary_area = os.path.join(BASE_FOLDER, "output_secondary_area_{}.shp".format(min_diam))
+                arcpy.Delete_management(primary_area)
+                arcpy.Delete_management(secondary_area)
+
+                arcpy.Select_analysis(thiessen_fc, primary_area, '"area" > {}'.format(threshold_area))
+                arcpy.Select_analysis(thiessen_fc, secondary_area, '"area" <= {}'.format(threshold_area))
+
+                add_layer_to_view(primary_area)
+                add_layer_to_view(secondary_area)
+
+                primary_craters = os.path.join(BASE_FOLDER, "output_primary_craters_{}.shp".format(min_diam))
+                arcpy.Delete_management(primary_craters)
+                selection = arcpy.SelectLayerByLocation_management(crater_detection_layer, "WITHIN", primary_area)
+                arcpy.CopyFeatures_management(selection, primary_craters)
+
+                add_layer_to_view(primary_craters, order="TOP")
+
+                secondary_craters = os.path.join(BASE_FOLDER, "output_secondary_craters_{}.shp".format(min_diam))
+                arcpy.Delete_management(secondary_craters)
+                secondary_selection = arcpy.SelectLayerByLocation_management(crater_detection_layer, "WITHIN", secondary_area)
+                arcpy.CopyFeatures_management(secondary_selection, secondary_craters)
+
+                add_layer_to_view(secondary_craters, order="TOP")
