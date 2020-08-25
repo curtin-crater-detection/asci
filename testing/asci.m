@@ -6,8 +6,8 @@ clc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%% Enter parameter %%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-path = 'C:\Users\279295C\Documents\postdoc_1\SCIA';
-cd 'C:\Users\279295C\Documents\postdoc_1\SCIA';
+path = 'C:\Users\Documents\postdoc_1\SCIA';
+cd 'C:\Users\Documents\postdoc_1\SCIA';
 
 area=readtable('area.csv');
 area_size =area(:,13);

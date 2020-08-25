@@ -1,10 +1,10 @@
 import arcpy
 import pandas as pd
-import scia_utils
+import asci_utils
 import os
 
 # uncomment for testing
-reload(scia_utils)
+reload(asci_utils)
 
 class Toolbox(object):
     def __init__(self):
@@ -240,7 +240,7 @@ class SecondaryCraterRemovalTool(object):
 
                 arcpy.AddMessage("counting area size: {}".format(counting_area_size))
 
-                threshold_area = scia_utils.simulate_crater_populations(df, counting_area_size, simulation_iterations, debug)
+                threshold_area = asci_utils.simulate_crater_populations(df, counting_area_size, simulation_iterations, debug)
 
                 arcpy.AddMessage("threshold_area: {}".format(threshold_area))
 
