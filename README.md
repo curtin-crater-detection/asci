@@ -26,13 +26,14 @@ In addition to `arcpy`, this toolbox utilises a couple of other external Python 
 - `shapely`
 - `scipy`
 - `numpy`
+- `jinja`
 
 These need to be installed using the ArcGIS Python executable as follows. Note - if your ArcGIS installation is in a different folder, please amend the initial path in the commands accordingly.
 
 The precompiled Python wheel for Shapely must be used instead of building from source. Download the Shapely-1.6.4.post2-cp27-cp27m-win32.whl wheel from [this link](https://www.lfd.uci.edu/~gohlke/pythonlibs/#shapely) and save it to your local downloads folder.
 
 ```cmd
-C:\Python27\ArcGIS10.6\python.exe -m pip install pandas scipy matplotlib numpy
+C:\Python27\ArcGIS10.6\python.exe -m pip install pandas scipy matplotlib numpy Jinja2
 
 # The following command installs the Shapely wheel that you have downloaded as per the above instructions
 C:\Python27\ArcGIS10.6\python.exe -m pip install C:\Users\YOUR_USERNAME\Downloads\Shapely-1.6.4.post2-cp27-cp27m-win32.whl

@@ -1,10 +1,12 @@
 import arcpy
 import pandas as pd
 import asci_utils
+import scc
 import os
 
 # uncomment for testing
 reload(asci_utils)
+reload(scc)
 
 class Toolbox(object):
     def __init__(self):
@@ -156,10 +158,19 @@ class SecondaryCraterRemovalTool(object):
 
         param8.value = False
 
+        param9 = arcpy.Parameter(
+            displayName="Create Spatial Crater Count (.scc) file",
+            name="scc_output",
+            datatype="GPBoolean",
+            direction="Input"
+        )
+
+        param9.value = True
+
         param2.filter.list = ["File System"]
 
 
-        params = [param0, param1, param2, param3, param4, param5, param6, param7, param8]
+        params = [param0, param1, param2, param3, param4, param5, param6, param7, param8, param9]
 
         return params
 
@@ -189,8 +200,12 @@ class SecondaryCraterRemovalTool(object):
         BASE_FOLDER = parameters[2].valueAsText
         use_diam_binning = parameters[7].value
         debug = parameters[8].value
+        scc_output = parameters[9].value
 
         arcpy.AddMessage("BASE_FOLDER: {0}".format(BASE_FOLDER))
+
+        # a list of all dataframes of primary craters; will be combined together and output to .scc
+        primary_craters_dfs = []
 
         if(use_diam_binning):
             diameter_bins = [0, 88, 125, 177, 250, 354, 500, 707, 1000, 1410, 2000, float("inf")]
@@ -198,7 +213,9 @@ class SecondaryCraterRemovalTool(object):
             diameter_bins = [0, float("inf")]
 
         # clear any existing selections
-        arcpy.SelectLayerByAttribute_management(crater_detection_layer, "CLEAR_SELECTION") 
+        arcpy.SelectLayerByAttribute_management(crater_detection_layer, "CLEAR_SELECTION")
+
+        counting_area_size = get_counting_area_size(counting_area_layer, area_feature_name)
 
         for min_diam, max_diam in get_pairs(diameter_bins):
 
@@ -221,6 +238,10 @@ class SecondaryCraterRemovalTool(object):
                 arcpy.Delete_management(primary_craters)
                 arcpy.CopyFeatures_management(craters_within_diam_range, primary_craters)
 
+                # add all craters to the primary_craters_dfs list
+                df = arcgis_table_to_dataframe(thiessen_fc, [lat_feature_name, lon_feature_name, 'diameter'])
+                primary_craters_dfs.append(df)
+
                 add_layer_to_view(primary_craters, order="TOP")
             elif crater_count > 10:
                 result = arcpy.CreateThiessenPolygons_analysis(in_features=craters_within_diam_range,out_feature_class=thiessen_fc,fields_to_copy="ALL")
@@ -233,10 +254,20 @@ class SecondaryCraterRemovalTool(object):
 
                 arcpy.AddMessage("thiessen layer: {0}".format(type(result)))
 
-                df = arcgis_table_to_dataframe(thiessen_fc, [lat_feature_name, lon_feature_name, 'area'])
+                df = arcgis_table_to_dataframe(thiessen_fc, [lat_feature_name, lon_feature_name, 'area', 'diameter'])
+                
+                # example dataframe structure - note that lat_feature_name is `lat_c` and lon_feature_name is `long_c`
+                # in this example.
+                #         lat_c     long_c         area
+                # 0    7.120873 -33.721281    30.712799
+                # 1    7.117214 -33.680864    97.473701
+                # 2    7.324158 -33.913995   565.614990
+                # 3    7.136194 -33.759924   856.038025
+                # 4    6.968860 -33.335060   337.096008
+                # 5    6.839843 -33.391527   418.049011
+                # 6    7.352073 -33.733537   106.735001
+                # 7    7.113171 -33.704781   174.574997
                 arcpy.AddMessage(str(df))
-
-                counting_area_size = get_counting_area_size(counting_area_layer, area_feature_name)
 
                 arcpy.AddMessage("counting area size: {}".format(counting_area_size))
 
@@ -257,14 +288,31 @@ class SecondaryCraterRemovalTool(object):
 
                 primary_craters = os.path.join(BASE_FOLDER, "output_primary_craters_{}.shp".format(min_diam))
                 arcpy.Delete_management(primary_craters)
-                selection = arcpy.SelectLayerByLocation_management(craters_within_diam_range, "WITHIN", primary_area)
+                selection = arcpy.SelectLayerByLocation_management(crater_detection_layer, "WITHIN", primary_area)
                 arcpy.CopyFeatures_management(selection, primary_craters)
 
                 add_layer_to_view(primary_craters, order="TOP")
 
                 secondary_craters = os.path.join(BASE_FOLDER, "output_secondary_craters_{}.shp".format(min_diam))
                 arcpy.Delete_management(secondary_craters)
-                secondary_selection = arcpy.SelectLayerByLocation_management(craters_within_diam_range, "WITHIN", secondary_area)
+                secondary_selection = arcpy.SelectLayerByLocation_management(crater_detection_layer, "WITHIN", secondary_area)
                 arcpy.CopyFeatures_management(secondary_selection, secondary_craters)
 
                 add_layer_to_view(secondary_craters, order="TOP")
+
+                # add primary craters to primary_craters_dfs list
+                primary_craters_df = df[df['area'] > threshold_area]
+                primary_craters_dfs.append(primary_craters_df)
+        if(scc_output):
+            # combine all primary craters together and output as SCC file
+            arcpy.AddMessage("Creating SCC file..")
+            all_primary_craters = pd.concat(primary_craters_dfs)
+            # standardise dataframe column names
+            all_primary_craters.columns = ['lat', 'lon', 'area', 'diameter']
+            all_primary_craters.to_csv(os.path.join(BASE_FOLDER, "primary_craters.csv"))
+            arcpy.AddMessage(str(all_primary_craters))
+            scc_text = scc.create_scc_text(all_primary_craters, counting_area_size)
+            scc_file = os.path.join(BASE_FOLDER, "output.scc")
+            with open(scc_file, "w") as f:
+                f.write(scc_text)
+            arcpy.AddMessage("SCC file has been saved to {}".format(scc_file))
