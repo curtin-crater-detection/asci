@@ -257,14 +257,14 @@ class SecondaryCraterRemovalTool(object):
 
                 primary_craters = os.path.join(BASE_FOLDER, "output_primary_craters_{}.shp".format(min_diam))
                 arcpy.Delete_management(primary_craters)
-                selection = arcpy.SelectLayerByLocation_management(crater_detection_layer, "WITHIN", primary_area)
+                selection = arcpy.SelectLayerByLocation_management(craters_within_diam_range, "WITHIN", primary_area)
                 arcpy.CopyFeatures_management(selection, primary_craters)
 
                 add_layer_to_view(primary_craters, order="TOP")
 
                 secondary_craters = os.path.join(BASE_FOLDER, "output_secondary_craters_{}.shp".format(min_diam))
                 arcpy.Delete_management(secondary_craters)
-                secondary_selection = arcpy.SelectLayerByLocation_management(crater_detection_layer, "WITHIN", secondary_area)
+                secondary_selection = arcpy.SelectLayerByLocation_management(craters_within_diam_range, "WITHIN", secondary_area)
                 arcpy.CopyFeatures_management(secondary_selection, secondary_craters)
 
                 add_layer_to_view(secondary_craters, order="TOP")
